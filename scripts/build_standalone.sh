@@ -38,4 +38,7 @@ if [ "$(uname)" == "Darwin" ]; then
     export MACOSX_DEPLOYMENT_TARGET=10.13
 fi
 
+echo "Building with Python version:"
+python --version
+
 pyinstaller --onefile --add-data "aider/resources${sep}aider/resources" --name aider aider.py
