@@ -9,10 +9,25 @@ fi
 
 # 2. Create the aider.py entrypoint file
 cat > aider.py <<EOF
-from aider.main import main
+import sys
+import traceback
+
+print("Debug: Aider standalone startup", flush=True)
+
+try:
+    from aider.main import main
+except Exception:
+    print("Debug: Import failed", flush=True)
+    traceback.print_exc()
+    sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print("Debug: Exception during main execution", flush=True)
+        traceback.print_exc()
+        sys.exit(1)
 EOF
 
 # 3. Execute the build

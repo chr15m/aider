@@ -449,6 +449,7 @@ def sanity_check_repo(repo, io):
 
 
 def main(argv=None, input=None, output=None, force_git_root=None, return_coder=False):
+    print("Debug: Entering aider.main.main", flush=True)
     report_uncaught_exceptions()
 
     if argv is None:
