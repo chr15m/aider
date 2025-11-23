@@ -34,4 +34,8 @@ EOF
 # Determine path separator (semicolon for Windows, colon for others)
 sep=$(python -c "import os; print(os.pathsep)")
 
+if [ "$(uname)" == "Darwin" ]; then
+    export MACOSX_DEPLOYMENT_TARGET=10.13
+fi
+
 pyinstaller --onefile --add-data "aider/resources${sep}aider/resources" --name aider aider.py
