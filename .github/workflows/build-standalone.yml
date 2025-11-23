@@ -13,8 +13,10 @@ jobs:
         include:
           - os: ubuntu-latest
             asset_name: aider-linux
-          - os: macos-latest
-            asset_name: aider-macos
+          - os: macos-13
+            asset_name: aider-macos-x64
+          - os: macos-14
+            asset_name: aider-macos-arm64
           - os: windows-latest
             asset_name: aider-windows.exe
 

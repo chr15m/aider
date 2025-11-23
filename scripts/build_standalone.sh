@@ -34,8 +34,4 @@ EOF
 # Determine path separator (semicolon for Windows, colon for others)
 sep=$(python -c "import os; print(os.pathsep)")
 
-if [ "$(uname)" == "Darwin" ]; then
-    pyinstaller --onefile --target-arch universal2 --add-data "aider/resources${sep}aider/resources" --name aider aider.py
-else
-    pyinstaller --onefile --add-data "aider/resources${sep}aider/resources" --name aider aider.py
-fi
+pyinstaller --onefile --add-data "aider/resources${sep}aider/resources" --name aider aider.py
