@@ -11,13 +11,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             asset_name: aider-linux
-          - os: macos-12
+          - os: macos-15-intel
             asset_name: aider-macos-x64
           - os: macos-14
             asset_name: aider-macos-arm64
-          - os: windows-latest
+          - os: windows-2022
             asset_name: aider-windows.exe
 
     runs-on: ${{ matrix.os }}
@@ -42,7 +42,7 @@ jobs:
       - name: Rename binary
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          if [ "${{ matrix.os }}" == "windows-2022" ]; then
             mv dist/aider.exe dist/${{ matrix.asset_name }}
           else
             mv dist/aider dist/${{ matrix.asset_name }}
