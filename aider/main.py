@@ -1,4 +1,3 @@
-import configparser
 import glob
 import json
 import os
@@ -468,6 +467,7 @@ def expand_glob_patterns(patterns, root="."):
             expanded_files.append(pattern)
     return expanded_files
 
+
 def main(argv=None, input=None, output=None, force_git_root=None, return_coder=False):
     report_uncaught_exceptions()
 
@@ -700,7 +700,7 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
     all_files = args.files + (args.file or [])
     all_files = expand_glob_patterns(all_files)
     fnames = [str(Path(fn).resolve()) for fn in all_files]
-    
+
     # Expand glob patterns in read arguments
     read_patterns = args.read or []
     read_expanded = expand_glob_patterns(read_patterns)
