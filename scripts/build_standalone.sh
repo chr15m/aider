@@ -16,4 +16,6 @@ if __name__ == "__main__":
 EOF
 
 # 3. Execute the build
-pyinstaller --onefile --add-data "aider/resources:aider/resources" --name aider aider.py
+# Determine path separator (semicolon for Windows, colon for others)
+sep=$(python -c "import os; print(os.pathsep)")
+pyinstaller --onefile --add-data "aider/resources${sep}aider/resources" --name aider aider.py
