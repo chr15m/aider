@@ -1,0 +1,70 @@
+name: Create Release with Standalone Binaries
+
+on:
+  push:
+    branches:
+      - build-standalone
+      - chrism-fork
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            asset_name: aider-linux
+          - os: macos-13
+            asset_name: aider-macos-x64
+          - os: macos-14
+            asset_name: aider-macos-arm64
+          - os: windows-2022
+            asset_name: aider-windows.exe
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: runner.os != 'macOS'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up Python (macOS)
+        if: runner.os == 'macOS'
+        uses: gabrielfalcao/pyenv-action@v18
+        with:
+          default: 3.10.13
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '11.0' || '10.13' }}
+
+      - name: Install dependencies
+        run: pip install .
+
+      - name: Build binary
+        shell: bash
+        run: ./scripts/build_standalone.sh
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-2022" ]; then
+            mv dist/aider.exe dist/${{ matrix.asset_name }}
+          else
+            mv dist/aider dist/${{ matrix.asset_name }}
+          fi
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.asset_name }}
+          tag_name: release-${{ github.run_number }}-${{ github.sha }}
+          name: Release ${{ github.run_number }}
+          body: |
+            Automated release of aider binaries.
+            Commit: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
