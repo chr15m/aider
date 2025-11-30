@@ -12,13 +12,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            asset_name: aider-linux
+            asset_suffix: linux
           - os: macos-13
-            asset_name: aider-macos-x64
+            asset_suffix: macos-x64
           - os: macos-14
-            asset_name: aider-macos-arm64
+            asset_suffix: macos-arm64
           - os: windows-2022
-            asset_name: aider-windows.exe
+            asset_suffix: windows
 
     runs-on: ${{ matrix.os }}
     permissions:
@@ -51,20 +51,21 @@ jobs:
       - name: Rename binary
         shell: bash
         run: |
+          REPO_NAME="${{ github.event.repository.name }}"
           if [ "${{ matrix.os }}" == "windows-2022" ]; then
-            mv dist/aider.exe dist/${{ matrix.asset_name }}
+            mv dist/aider.exe "dist/${REPO_NAME}-${{ matrix.asset_suffix }}.exe"
           else
-            mv dist/aider dist/${{ matrix.asset_name }}
+            mv dist/aider "dist/${REPO_NAME}-${{ matrix.asset_suffix }}"
           fi
 
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/${{ matrix.asset_name }}
+          files: dist/${{ github.event.repository.name }}-${{ matrix.asset_suffix }}${{ matrix.os == 'windows-2022' && '.exe' || '' }}
           tag_name: release-${{ github.run_number }}-${{ github.sha }}
           name: Release ${{ github.run_number }}
           body: |
-            Automated release of aider binaries.
+            Automated release of ${{ github.event.repository.name }} binaries.
             Commit: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
