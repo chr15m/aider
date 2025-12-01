@@ -2,7 +2,7 @@ aider-cm - an opinionated fork of [aider](https://aider.chat), an AI pair-progra
 
 Download [aider-cm as a single-file executable](https://github.com/chr15m/aider/releases/) for easy installation.
 
-Learn about aider itself in the [https://github.com/Aider-AI/aider/](original README.md) and at <https://aider.chat>.
+Learn about aider itself in the [original README.md](https://github.com/Aider-AI/aider/) and at <https://aider.chat>.
 
 # Features
 
