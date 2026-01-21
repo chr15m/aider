@@ -13,9 +13,9 @@ jobs:
         include:
           - os: ubuntu-22.04
             asset_suffix: linux
-          - os: macos-13
-            asset_suffix: macos-x64
           - os: macos-14
+            asset_suffix: macos-x64
+          - os: macos-latest
             asset_suffix: macos-arm64
           - os: windows-2022
             asset_suffix: windows
@@ -39,7 +39,7 @@ jobs:
         with:
           default: 3.10.13
         env:
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '11.0' || '10.13' }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.asset_suffix == 'macos-arm64' && '11.0' || '10.13' }}
 
       - name: Install dependencies
         run: pip install .
