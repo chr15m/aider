@@ -14,6 +14,7 @@ These are the feature branches merged into this fork:
 - [`no-auto-commits-staging`](https://github.com/Aider-AI/aider/pull/4682) - stops aider from staging files with `--no-auto-commits`.
 - [`save-response-command`](https://github.com/Aider-AI/aider/pull/4683) - gives you `/save-response FILE.md` to save the last response.
 - [`summarize-command`](https://github.com/Aider-AI/aider/pull/4777) - adds a `/summarize` command to create a technical summary of the chat.
+- [`restore-session-command`](https://github.com/Aider-AI/aider/pull/4782) - adds `/list-sessions`, `/restore-session` to to manage history, and saves `/run` output.
 
 # Opinionated fork opinions
 
