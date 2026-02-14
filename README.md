@@ -15,6 +15,7 @@ These are the feature branches merged into this fork:
 - [`save-response-command`](https://github.com/Aider-AI/aider/pull/4683) - gives you `/save-response FILE.md` to save the last response.
 - [`summarize-command`](https://github.com/Aider-AI/aider/pull/4777) - adds a `/summarize` command to create a technical summary of the chat.
 - [`restore-session-command`](https://github.com/Aider-AI/aider/pull/4782) - adds `/list-sessions`, `/restore-session` to to manage history, and saves `/run` output.
+- [`add-readonly-no-git-feature`](https://github.com/Aider-AI/aider/pull/4830) - allows adding files outside the repo if `git_commits` is false.
 
 # Opinionated fork opinions
 
