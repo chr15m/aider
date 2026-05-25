@@ -927,42 +927,55 @@ class Commands:
             # Expand tilde in the path
             expanded_word = os.path.expanduser(word)
 
-            # Handle read-only files with substring matching and samefile check
-            read_only_matched = []
-            for f in self.coder.abs_read_only_fnames:
-                if expanded_word in f:
-                    read_only_matched.append(f)
-                    continue
-
-                # Try samefile comparison for relative paths
-                try:
-                    abs_word = os.path.abspath(expanded_word)
-                    if os.path.samefile(abs_word, f):
-                        read_only_matched.append(f)
-                except (FileNotFoundError, OSError):
-                    continue
-
-            for matched_file in read_only_matched:
-                self.coder.abs_read_only_fnames.remove(matched_file)
-                self.io.tool_output(f"Removed read-only file {matched_file} from the chat")
-
-            # For editable files, use glob if word contains glob chars, otherwise use substring
+            matched_abs = set()
             if any(c in expanded_word for c in "*?[]"):
-                matched_files = self.glob_filtered_to_repo(expanded_word)
+                if os.path.isabs(expanded_word):
+                    matches = glob.glob(expanded_word, recursive=True)
+                    matches = [Path(m) for m in matches]
+                else:
+                    try:
+                        matches = list(Path(self.coder.root).glob(expanded_word))
+                    except Exception:
+                        matches = []
+
+                for m in matches:
+                    matched_abs.add(str(m.resolve()))
             else:
-                # Use substring matching like we do for read-only files
-                matched_files = [
-                    self.coder.get_rel_fname(f) for f in self.coder.abs_fnames if expanded_word in f
-                ]
+                all_chat_files = self.coder.abs_fnames | self.coder.abs_read_only_fnames
+                for f in all_chat_files:
+                    if expanded_word in f:
+                        matched_abs.add(f)
+                        continue
 
-            if not matched_files:
-                matched_files.append(expanded_word)
+                    try:
+                        abs_word = os.path.abspath(expanded_word)
+                        if os.path.samefile(abs_word, f):
+                            matched_abs.add(f)
+                    except (FileNotFoundError, OSError):
+                        continue
 
-            for matched_file in matched_files:
-                abs_fname = self.coder.abs_root_path(matched_file)
+            matched_in_chat = []
+            for abs_fname in matched_abs:
+                if (
+                    abs_fname in self.coder.abs_fnames
+                    or abs_fname in self.coder.abs_read_only_fnames
+                ):
+                    matched_in_chat.append(abs_fname)
+
+            if not matched_in_chat:
+                self.io.tool_error(f"No files matched '{word}' in the chat")
+                continue
+
+            for abs_fname in matched_in_chat:
                 if abs_fname in self.coder.abs_fnames:
                     self.coder.abs_fnames.remove(abs_fname)
-                    self.io.tool_output(f"Removed {matched_file} from the chat")
+                    rel_fname = self.coder.get_rel_fname(abs_fname)
+                    self.io.tool_output(f"Removed {rel_fname} from the chat")
+
+                if abs_fname in self.coder.abs_read_only_fnames:
+                    self.coder.abs_read_only_fnames.remove(abs_fname)
+                    rel_fname = self.coder.get_rel_fname(abs_fname)
+                    self.io.tool_output(f"Removed read-only file {rel_fname} from the chat")
 
     def cmd_git(self, args):
         "Run a git command (output excluded from chat)"
@@ -1037,6 +1050,9 @@ class Commands:
                 command=args,
                 output=combined_output,
             )
+
+            history_msg = "\n".join([f">>> {line}" for line in msg.splitlines()])
+            self.io.append_chat_history(f"\n{history_msg}\n\nOk.\n\n")
 
             self.coder.cur_messages += [
                 dict(role="user", content=msg),
@@ -1577,6 +1593,26 @@ class Commands:
         "Alias for /editor: Open an editor to write a prompt"
         return self.cmd_editor(args)
 
+    def cmd_summarize(self, args):
+        "Create a technical summary of the chat and work done so far"
+        from datetime import datetime
+
+        filename = args.strip()
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        if filename:
+            file_instruction = f"Save this summary into `{filename}`."
+        else:
+            file_instruction = (
+                "Save this summary into a new Markdown file named "
+                f"`SUMMARY-{today}-description.md`, replacing 'description' "
+                "with a 3-5 word slug representing our task."
+            )
+
+        prompt = prompts.summarize_command_prompt.format(file_instruction=file_instruction).strip()
+
+        return self._generic_chat_command(prompt, self.coder.main_model.edit_format)
+
     def cmd_think_tokens(self, args):
         """Set the thinking token budget, eg: 8096, 8k, 10.5k, 0.5M, or 0 to disable."""
         model = self.coder.main_model
@@ -1635,6 +1671,142 @@ class Commands:
         announcements = "\n".join(self.coder.get_announcements())
         self.io.tool_output(announcements)
 
+    def _get_sessions(self):
+        if not self.io.chat_history_file or not self.io.chat_history_file.exists():
+            self.io.tool_error("No chat history file found.")
+            return None
+
+        history_md = self.io.read_text(self.io.chat_history_file)
+        if not history_md:
+            self.io.tool_error("Chat history file is empty.")
+            return None
+
+        from aider.utils import split_chat_history_markdown
+
+        sessions = split_chat_history_markdown(history_md, include_tool=True, return_sessions=True)
+
+        # Filter out sessions that are just a "Restored session from..." notification,
+        # have no messages, have no user messages, or only contain /restore-session
+        # or /list-sessions commands.
+        # We do this BEFORE popping the current session to ensure we catch all of them.
+        filtered_sessions = []
+        for s in sessions:
+            msgs = s["messages"]
+            if not msgs:
+                continue
+
+            # Check if all user messages are just session management commands
+            user_msgs = [m["content"].strip() for m in msgs if m["role"] == "user"]
+            if not user_msgs:
+                continue
+
+            if all(
+                c.startswith("/restore-session") or c.startswith("/list-sessions")
+                for c in user_msgs
+            ):
+                continue
+
+            # Filter out single-message "Restored session from..." notifications
+            if len(msgs) == 1:
+                content = msgs[0]["content"].strip()
+                if content.startswith("Restored session from"):
+                    continue
+
+            filtered_sessions.append(s)
+
+        sessions = filtered_sessions
+
+        # The last session in the file is the current one containing this command
+        if sessions:
+            sessions.pop()
+
+        return sessions
+
+    def _display_session(self, session, index=None, limit=1024):
+        timestamp = session["timestamp"]
+        messages = session["messages"]
+        prefix = f"[{index}] " if index is not None else ""
+        self.io.tool_output(f"{prefix}Session from {timestamp} ({len(messages)} messages).")
+
+        user_msgs = [m["content"] for m in messages if m["role"] == "user"]
+        if user_msgs:
+
+            def get_snippet(text):
+                line = text.strip().splitlines()[0]
+                if len(line) > limit:
+                    return line[:limit] + "..."
+                return line
+
+            first_snippet = get_snippet(user_msgs[0])
+            last_snippet = get_snippet(user_msgs[-1])
+            self.io.tool_output(f"  First user message: {first_snippet}")
+            if len(user_msgs) > 1:
+                self.io.tool_output(f"  Last user message:  {last_snippet}")
+
+    def cmd_list_sessions(self, args):
+        "List previous chat sessions"
+        sessions = self._get_sessions()
+        if not sessions:
+            return
+
+        # sessions are chronological.
+        # We want to display them such that the most recent is at the bottom.
+        # The index i is stable and chronological (0 is the oldest).
+        for i, session in enumerate(sessions):
+            if i > 0:
+                self.io.tool_output()
+            self._display_session(session, index=i)
+
+    def cmd_restore_session(self, args):
+        "Restore the chat context from a previous session"
+        sessions = self._get_sessions()
+        if not sessions:
+            return
+
+        # sessions are in chronological order.
+        # /list-sessions shows them in chronological order (oldest first) starting at index 0.
+        # So index 0 in /list-sessions is sessions[0].
+        # /restore-session with no args restores the last session (sessions[-1]).
+
+        try:
+            raw_args = args.strip()
+            if not raw_args:
+                idx = -1
+            else:
+                n = int(raw_args)
+                if n >= 0:
+                    # Positive index: chronological index from /list-sessions
+                    idx = n
+                else:
+                    # Negative index: -1 is the most recent session (sessions[-1])
+                    idx = n
+        except ValueError:
+            self.io.tool_error("Session index must be an integer.")
+            return
+
+        if (idx >= 0 and idx >= len(sessions)) or (idx < 0 and abs(idx) > len(sessions)):
+            self.io.tool_error(
+                f"Session index {n} is out of bounds. Only {len(sessions)} sessions available."
+            )
+            return
+
+        target_session = sessions[idx]
+        timestamp = target_session["timestamp"]
+        messages = target_session["messages"]
+
+        # Replace context
+        self.coder.cur_messages = []
+        self.coder.done_messages = messages
+
+        # Persistence
+        self.io.append_chat_history(f"\n# aider chat restore session from {timestamp}\n\n")
+
+        # Maintenance
+        self.coder.summarize_start()
+
+        # Feedback
+        self._display_session(target_session, limit=250)
+
     def cmd_copy_context(self, args=None):
         """Copy the current chat context as markdown, suitable to paste into a web UI"""
 
@@ -1678,6 +1850,46 @@ Just show me the edits I need to make.
             )
         except Exception as e:
             self.io.tool_error(f"An unexpected error occurred while copying to clipboard: {str(e)}")
+
+    def completions_raw_save_response(self, document, complete_event):
+        return self.completions_raw_read_only(document, complete_event)
+
+    def cmd_save_response(self, args):
+        "Save the last assistant message to a file"
+        if not args.strip():
+            self.io.tool_error("Please provide a filename to save the response to.")
+            return
+
+        all_messages = self.coder.done_messages + self.coder.cur_messages
+        assistant_messages = [msg for msg in reversed(all_messages) if msg["role"] == "assistant"]
+
+        if not assistant_messages:
+            self.io.tool_error("No assistant messages found to save.")
+            return
+
+        last_assistant_message = assistant_messages[0]["content"]
+
+        filename = args.strip()
+        # Expand user home directory if present
+        filename = os.path.expanduser(filename)
+
+        # Make path absolute relative to coder root if not already absolute
+        if not os.path.isabs(filename):
+            filename = os.path.join(self.coder.root, filename)
+
+        # Check if file exists and prompt for confirmation
+        if os.path.exists(filename):
+            if not self.io.confirm_ask(f"File {args.strip()} already exists. Overwrite?"):
+                self.io.tool_output("Save cancelled.")
+                return
+
+        try:
+            # Create parent directories if they don't exist
+            Path(filename).parent.mkdir(parents=True, exist_ok=True)
+            self.io.write_text(filename, last_assistant_message)
+            self.io.tool_output(f"Saved assistant response to {args.strip()}")
+        except Exception as e:
+            self.io.tool_error(f"Error saving response to file: {e}")
 
 
 def expand_subdir(file_path):

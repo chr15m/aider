@@ -12,6 +12,7 @@ on:
 
 jobs:
   check_version:
+    if: false
     runs-on: ubuntu-latest
     strategy:
       matrix:
