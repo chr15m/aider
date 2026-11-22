@@ -1075,25 +1075,7 @@ class TestCommands(TestCase):
                 )
             )
 
-            # Try to add the read-only file
-            commands.cmd_add(str(test_file))
-
-            # It's not in the repo, should not do anything
-            self.assertFalse(
-                any(os.path.samefile(str(test_file.resolve()), fname) for fname in coder.abs_fnames)
-            )
-            self.assertTrue(
-                any(
-                    os.path.samefile(str(test_file.resolve()), fname)
-                    for fname in coder.abs_read_only_fnames
-                )
-            )
-
-            repo = git.Repo()
-            repo.git.add(str(test_file))
-            repo.git.commit("-m", "initial")
-
-            # Try to add the read-only file
+            # Try to add the read-only file (even though untracked)
             commands.cmd_add(str(test_file))
 
             # Verify it's now in abs_fnames and not in abs_read_only_fnames
