@@ -868,16 +868,11 @@ class Commands:
                 self.io.tool_error(f"{matched_file} is already in the chat as an editable file")
                 continue
             elif abs_file_path in self.coder.abs_read_only_fnames:
-                if self.coder.repo and self.coder.repo.path_in_repo(matched_file):
-                    self.coder.abs_read_only_fnames.remove(abs_file_path)
-                    self.coder.abs_fnames.add(abs_file_path)
-                    self.io.tool_output(
-                        f"Moved {matched_file} from read-only to editable files in the chat"
-                    )
-                else:
-                    self.io.tool_error(
-                        f"Cannot add {matched_file} as it's not part of the repository"
-                    )
+                self.coder.abs_read_only_fnames.remove(abs_file_path)
+                self.coder.abs_fnames.add(abs_file_path)
+                self.io.tool_output(
+                    f"Moved {matched_file} from read-only to editable files in the chat"
+                )
             else:
                 if is_image_file(matched_file) and not self.coder.main_model.info.get(
                     "supports_vision"
